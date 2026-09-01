@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0b0f14">
+<title>UrbanCool Twin — Environmental Intelligence</title>
+<style>
+:root{
+  --bg:#f5f7fa;--surface:#fff;--surface2:#eef2f5;--border:#dbe2e8;
+  --text:#17202a;--muted:#66727e;--accent:#2563eb;--green:#16a34a;
+  --yellow:#eab308;--orange:#f97316;--red:#dc2626;--blue:#0284c7;
+  --shadow:0 8px 30px rgba(20,35,50,.07);--radius:18px;
+}
+[data-theme="dark"]{
+  --bg:#0b0f14;--surface:#111820;--surface2:#17212b;--border:#26313c;
+  --text:#f5f7fa;--muted:#9aa6b2;--accent:#60a5fa;
+  --shadow:0 10px 35px rgba(0,0,0,.22);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+button,input,select{font:inherit}
+button{cursor:pointer}
+a{color:inherit;text-decoration:none}
+.container{width:min(1400px,calc(100% - 32px));margin:auto}
+header{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(16px);border-bottom:1px solid var(--border)}
+.nav{height:70px;display:flex;align-items:center;gap:28px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:-.4px}
+.logo-mark{width:34px;height:34px;border-radius:11px;background:linear-gradient(135deg,#2563eb,#16a34a);display:grid;place-items:center;color:white;font-weight:900}
+.navlinks{display:flex;gap:5px;align-items:center;flex:1}
+.navlinks button,.mobile-nav button{background:none;border:0;color:var(--muted);padding:9px 12px;border-radius:10px}
+.navlinks button.active,.navlinks button:hover,.mobile-nav button.active{background:var(--surface2);color:var(--text)}
+.actions{display:flex;gap:8px;align-items:center}
+.icon-btn,.btn{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:11px;padding:9px 12px}
+.btn.primary{background:var(--accent);color:white;border-color:var(--accent)}
+.btn.small{font-size:13px;padding:7px 10px}
+.menu-btn{display:none}
+main{padding:34px 0 70px}
+.page{display:none}.page.active{display:block}
+.eyebrow{font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+h1{font-size:clamp(32px,5vw,58px);line-height:1.02;letter-spacing:-2px;margin:10px 0 16px;max-width:850px}
+h2{font-size:24px;margin:0 0 6px;letter-spacing:-.6px}
+h3{font-size:16px;margin:0 0 4px}
+p{color:var(--muted);line-height:1.6}
+.hero{padding:36px 0 25px;display:grid;grid-template-columns:1.35fr .65fr;gap:30px;align-items:end}
+.hero-copy p{max-width:700px;font-size:17px}
+.hero-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
+.hero-side{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow)}
+.hero-side .big{font-size:42px;font-weight:800;margin:3px 0}
+.status{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding:10px 0}
+.status:last-child{border-bottom:0}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:7px}
+.live{color:var(--green)}.dot.live{background:var(--green)}
+.grid{display:grid;gap:16px}.metrics{grid-template-columns:repeat(4,1fr)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+.metric{padding:18px;position:relative;overflow:hidden}
+.metric .label{font-size:13px;color:var(--muted);font-weight:650}
+.metric .value{font-size:35px;font-weight:800;margin:7px 0 2px;letter-spacing:-1px}
+.metric .sub{font-size:12px;color:var(--muted)}
+.metric.aqi{border-top:3px solid var(--orange)}.metric.heat{border-top:3px solid var(--red)}
+.metric.temp{border-top:3px solid var(--orange)}.metric.green{border-top:3px solid var(--green)}
+.section-head{display:flex;justify-content:space-between;gap:12px;align-items:end;margin:30px 0 12px}
+.map-card{overflow:hidden}
+.map-wrap{height:520px;position:relative;background:#d9e0dc;overflow:hidden}
+[data-theme="dark"] .map-wrap{background:#17211f}
+.map-base{position:absolute;inset:0;background:
+  linear-gradient(28deg,transparent 46%,rgba(255,255,255,.45) 47%,rgba(255,255,255,.45) 48%,transparent 49%),
+  linear-gradient(118deg,transparent 47%,rgba(255,255,255,.42) 48%,rgba(255,255,255,.42) 49%,transparent 50%),
+  repeating-linear-gradient(0deg,transparent 0 54px,rgba(120,130,125,.18) 55px 57px),
+  repeating-linear-gradient(90deg,transparent 0 82px,rgba(120,130,125,.14) 83px 85px);
+}
+[data-theme="dark"] .map-base{filter:brightness(.65) saturate(.7)}
+.heat-blob{position:absolute;border-radius:50%;filter:blur(28px);opacity:.68;mix-blend-mode:multiply}
+[data-theme="dark"] .heat-blob{mix-blend-mode:screen;opacity:.52}
+.blob1{width:300px;height:220px;left:17%;top:28%;background:#f97316}
+.blob2{width:240px;height:210px;left:47%;top:13%;background:#ef4444}
+.blob3{width:260px;height:180px;left:62%;top:49%;background:#eab308}
+.blob4{width:180px;height:150px;left:30%;top:58%;background:#eab308}
+.blob5{width:140px;height:120px;left:73%;top:25%;background:#22c55e}
+.road{position:absolute;background:rgba(255,255,255,.7);height:5px;transform-origin:left center;box-shadow:0 0 0 2px rgba(100,110,105,.08)}
+.road.r1{width:80%;left:7%;top:62%;transform:rotate(-18deg)}.road.r2{width:65%;left:20%;top:35%;transform:rotate(26deg)}.road.r3{width:55%;left:8%;top:48%;transform:rotate(70deg)}
+.map-controls{position:absolute;top:15px;left:15px;display:flex;gap:7px;flex-wrap:wrap;z-index:3}
+.layer-btn{background:var(--surface);border:1px solid var(--border);padding:8px 11px;border-radius:10px;color:var(--text);font-size:12px;box-shadow:var(--shadow)}
+.layer-btn.active{background:var(--text);color:var(--surface)}
+.legend{position:absolute;right:15px;bottom:15px;background:var(--surface);border:1px solid var(--border);padding:12px;border-radius:12px;font-size:11px;z-index:3}
+.gradient{width:150px;height:8px;border-radius:8px;background:linear-gradient(90deg,#22c55e,#eab308,#f97316,#dc2626);margin:7px 0}
+.marker{position:absolute;width:16px;height:16px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px #0006;z-index:4;cursor:pointer}
+.m1{left:39%;top:44%;background:#dc2626}.m2{left:54%;top:26%;background:#f97316}.m3{left:67%;top:60%;background:#eab308}.m4{left:28%;top:67%;background:#eab308}
+.map-popup{position:absolute;left:39%;top:44%;transform:translate(18px,-105%);background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:13px;width:190px;z-index:5;box-shadow:var(--shadow);display:none}
+.map-popup.show{display:block}.map-popup strong{display:block}.popup-row{display:flex;justify-content:space-between;font-size:12px;padding-top:7px;color:var(--muted)}
+.content-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:16px}
+.chart-card{padding:18px}.chart{height:250px;position:relative}.chart svg{width:100%;height:100%;overflow:visible}.gridline{stroke:var(--border);stroke-width:1}.line{fill:none;stroke:var(--accent);stroke-width:3}.area{fill:var(--accent);opacity:.12}.axis{fill:var(--muted);font-size:10px}
+.bar-list{display:grid;gap:14px;margin-top:18px}.bar-row{display:grid;grid-template-columns:105px 1fr 50px;align-items:center;gap:10px;font-size:12px}.bar{height:8px;background:var(--surface2);border-radius:10px;overflow:hidden}.bar span{display:block;height:100%;border-radius:10px;background:var(--accent)}
+.insight{padding:16px;border-left:3px solid var(--orange);background:var(--surface2);border-radius:12px;margin-top:14px}.insight b{font-size:13px}.insight p{font-size:13px;margin:5px 0 0}
+.page-title{padding:15px 0 22px}.page-title p{margin:5px 0;max-width:760px}
+.filters{padding:16px;display:grid;grid-template-columns:1.1fr 1fr 1fr 1fr auto;gap:10px;margin-bottom:16px}
+.field label{display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:5px}.field input,.field select{width:100%;padding:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);border-radius:10px;outline:none}
+.table-wrap{overflow:auto}.data-table{width:100%;border-collapse:collapse;min-width:760px}.data-table th,.data-table td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--border);font-size:12px}.data-table th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;cursor:pointer;white-space:nowrap}.data-table tr:hover td{background:var(--surface2)}
+.table-top{display:flex;justify-content:space-between;align-items:center;padding:16px;gap:10px}.export-group{display:flex;gap:6px;flex-wrap:wrap}
+.badge{display:inline-flex;align-items:center;padding:5px 8px;border-radius:99px;font-size:10px;font-weight:800}.badge.moderate{background:#fef3c7;color:#92400e}.badge.high{background:#fee2e2;color:#991b1b}.badge.good{background:#dcfce7;color:#166534}
+[data-theme="dark"] .badge.moderate{background:#443615;color:#facc15}[data-theme="dark"] .badge.high{background:#4a2024;color:#fca5a5}[data-theme="dark"] .badge.good{background:#173a27;color:#86efac}
+.compare{grid-template-columns:1fr 1fr}.compare-card{padding:20px}.compare-number{font-size:34px;font-weight:800}.delta.up{color:var(--red)}.delta.down{color:var(--green)}
+.source-grid{grid-template-columns:repeat(4,1fr)}.source{padding:16px}.source small{color:var(--muted);display:block;margin-top:4px}
+footer{border-top:1px solid var(--border);padding:28px 0;color:var(--muted);font-size:12px}
+.mobile-nav{display:none}
+@media(max-width:1000px){
+  .hero{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(2,1fr)}.content-grid{grid-template-columns:1fr}.source-grid{grid-template-columns:repeat(2,1fr)}
+  .navlinks{display:none}.menu-btn{display:block}.mobile-nav{position:absolute;top:70px;left:0;right:0;background:var(--surface);border-bottom:1px solid var(--border);padding:8px 16px;display:none;flex-direction:column}.mobile-nav.open{display:flex}
+}
+@media(max-width:650px){
+  .container{width:min(100% - 20px,1400px)}main{padding-top:18px}.nav{height:62px}.hero{padding-top:20px}h1{font-size:38px;letter-spacing:-1.5px}
+  .metrics{grid-template-columns:1fr 1fr;gap:10px}.metric{padding:14px}.metric .value{font-size:28px}.map-wrap{height:430px}
+  .filters{grid-template-columns:1fr 1fr}.filters .wide{grid-column:1/-1}.filters .apply{grid-column:1/-1}
+  .table-top{align-items:flex-start;flex-direction:column}.source-grid{grid-template-columns:1fr 1fr}
+  .nav{gap:10px}.actions{margin-left:auto}.btn.primary{padding:8px 10px}
+}
+@media(max-width:430px){
+  .metrics{grid-template-columns:1fr 1fr}.source-grid{grid-template-columns:1fr}.map-controls{right:10px}.layer-btn{font-size:11px;padding:7px 8px}.legend{right:10px;bottom:10px}
+}
+</style>
+</head>
+<body data-theme="dark">
+
+<header>
+  <div class="container nav">
+    <a class="logo" href="#" onclick="showPage('home');return false;">
+      <span class="logo-mark">U</span><span>UrbanCool Twin</span>
+    </a>
+    <nav class="navlinks">
+      <button class="active" data-page="home">Home</button>
+      <button data-page="map">Live Map</button>
+      <button data-page="air">Air Quality</button>
+      <button data-page="environment">Environment</button>
+      <button data-page="data">Data Explorer</button>
+      <button data-page="insights">Insights</button>
+    </nav>
+    <div class="actions">
+      <button class="icon-btn" id="themeBtn" title="Toggle theme">☀︎</button>
+      <button class="icon-btn menu-btn" id="menuBtn">☰</button>
+    </div>
+    <nav class="mobile-nav" id="mobileNav">
+      <button data-page="home">Home</button>
+      <button data-page="map">Live Map</button>
+      <button data-page="air">Air Quality</button>
+      <button data-page="environment">Environment</button>
+      <button data-page="data">Data Explorer</button>
+      <button data-page="insights">Insights</button>
+    </nav>
+  </div>
+</header>
+
+<main class="container">
+
+<section id="home" class="page active">
+  <div class="hero">
+    <div class="hero-copy">
+      <div class="eyebrow">Public environmental intelligence</div>
+      <h1>See how cities breathe, heat and change.</h1>
+      <p>UrbanCool Twin brings air quality, urban heat, vegetation, built density, weather and satellite observations into one public, explorable view.</p>
+      <div class="hero-actions">
+        <button class="btn primary" onclick="showPage('map')">Explore live map →</button>
+        <button class="btn" onclick="showPage('data')">Explore historical data</button>
+      </div>
+    </div>
+    <div class="hero-side">
+      <div class="eyebrow">Current city</div>
+      <div class="big">Bhubaneswar</div>
+      <div class="status"><span><span class="dot live"></span>Data services online</span><span class="live">Live</span></div>
+      <div class="status"><span>Last refresh</span><strong>5 min ago</strong></div>
+      <div class="status"><span>Observation coverage</span><strong>30 days</strong></div>
+    </div>
+  </div>
+
+  <div class="grid metrics">
+    <div class="card metric aqi"><div class="label">AIR QUALITY INDEX</div><div class="value">72</div><div><span class="badge moderate">Moderate</span></div><div class="sub">PM2.5 · 31 µg/m³</div></div>
+    <div class="card metric heat"><div class="label">HEAT RISK</div><div class="value">HIGH</div><div><span class="badge high">82% estimated</span></div><div class="sub">Model-derived probability</div></div>
+    <div class="card metric temp"><div class="label">AIR TEMPERATURE</div><div class="value">38.4°C</div><div class="sub">Feels like 40.1°C</div></div>
+    <div class="card metric green"><div class="label">VEGETATION</div><div class="value">28%</div><div class="sub">NDVI · 0.32</div></div>
+  </div>
+
+  <div class="section-head"><div><h2>Live urban heat</h2><p>Current spatial pattern · illustrative static map</p></div><button class="btn small" onclick="showPage('map')">Open full map</button></div>
+  <div class="card map-card"><div class="map-wrap" id="homeMap"></div></div>
+
+  <div class="section-head"><div><h2>Recent conditions</h2><p>Current trends from the selected city</p></div></div>
+  <div class="content-grid">
+    <div class="card chart-card"><h3>AQI · last 24 hours</h3><div class="chart" id="aqiChart"></div></div>
+    <div class="card chart-card"><h3>Temperature · last 24 hours</h3><div class="chart" id="tempChart"></div></div>
+  </div>
+
+  <div class="section-head"><div><h2>Data sources</h2><p>Each dataset retains its own update cadence.</p></div></div>
+  <div class="grid source-grid">
+    <div class="card source"><b>Air Quality</b><small>Updated 5 min ago</small></div>
+    <div class="card source"><b>Weather</b><small>Updated 15 min ago</small></div>
+    <div class="card source"><b>Satellite</b><small>Observation: 29 Aug</small></div>
+    <div class="card source"><b>Vegetation</b><small>Observation: 29 Aug</small></div>
+  </div>
+</section>
+
+<section id="map" class="page">
+  <div class="page-title"><div class="eyebrow">Geospatial view</div><h2>Live environmental map</h2><p>Switch between environmental layers and inspect representative locations.</p></div>
+  <div class="card map-card"><div class="map-wrap" id="fullMap"></div></div>
+</section>
+
+<section id="air" class="page">
+  <div class="page-title"><div class="eyebrow">Air quality</div><h2>Air quality over time</h2><p>Current pollution levels and historical observations for the selected area.</p></div>
+  <div class="grid metrics">
+    <div class="card metric aqi"><div class="label">AQI</div><div class="value">72</div><span class="badge moderate">Moderate</span></div>
+    <div class="card metric"><div class="label">PM2.5</div><div class="value">31</div><div class="sub">µg/m³</div></div>
+    <div class="card metric"><div class="label">PM10</div><div class="value">64</div><div class="sub">µg/m³</div></div>
+    <div class="card metric"><div class="label">NO₂</div><div class="value">28</div><div class="sub">µg/m³</div></div>
+  </div>
+  <div class="section-head"><div><h2>Trends</h2><p>Illustrative 30-day series</p></div></div>
+  <div class="content-grid">
+    <div class="card chart-card"><h3>AQI trend</h3><div class="chart" id="airTrend"></div></div>
+    <div class="card chart-card"><h3>Pollution components</h3><div class="bar-list">
+      <div class="bar-row"><span>PM2.5</span><div class="bar"><span style="width:72%"></span></div><b>72%</b></div>
+      <div class="bar-row"><span>PM10</span><div class="bar"><span style="width:58%"></span></div><b>58%</b></div>
+      <div class="bar-row"><span>NO₂</span><div class="bar"><span style="width:41%"></span></div><b>41%</b></div>
+      <div class="bar-row"><span>O₃</span><div class="bar"><span style="width:34%"></span></div><b>34%</b></div>
+    </div></div>
+  </div>
+</section>
+
+<section id="environment" class="page">
+  <div class="page-title"><div class="eyebrow">Urban environment</div><h2>Vegetation & built environment</h2><p>Explore the physical characteristics associated with urban heat patterns.</p></div>
+  <div class="grid metrics">
+    <div class="card metric green"><div class="label">VEGETATION COVER</div><div class="value">28%</div><div class="sub">NDVI 0.32</div></div>
+    <div class="card metric"><div class="label">BUILDING DENSITY</div><div class="value">67%</div><div class="sub">Selected zone</div></div>
+    <div class="card metric temp"><div class="label">LAND SURFACE TEMP.</div><div class="value">41.2°C</div><div class="sub">Latest satellite observation</div></div>
+    <div class="card metric"><div class="label">BUILT-UP AREA</div><div class="value">61%</div><div class="sub">Derived spatial indicator</div></div>
+  </div>
+  <div class="section-head"><div><h2>Environmental relationships</h2><p>Associations in the selected sample; not proof of causation.</p></div></div>
+  <div class="content-grid">
+    <div class="card chart-card"><h3>LST vs vegetation</h3><div class="chart" id="ndviChart"></div></div>
+    <div class="card chart-card"><h3>Building density vs heat</h3><div class="chart" id="buildingChart"></div></div>
+  </div>
+</section>
+
+<section id="data" class="page">
+  <div class="page-title"><div class="eyebrow">Public data portal</div><h2>Data Explorer</h2><p>Select a period, filter observations, sort the table and export the visible dataset.</p></div>
+  <div class="card filters">
+    <div class="field wide"><label>Search</label><input id="search" placeholder="Search date or value…"></div>
+    <div class="field"><label>From</label><input id="from" type="date" value="2026-08-01"></div>
+    <div class="field"><label>To</label><input id="to" type="date" value="2026-08-30"></div>
+    <div class="field"><label>Metric</label><select id="metricFilter"><option value="all">All observations</option><option value="aqi">AQI ≥ 80</option><option value="temp">Temp ≥ 38°C</option><option value="lst">LST ≥ 40°C</option><option value="ndvi">NDVI ≤ 0.30</option></select></div>
+    <button class="btn primary apply" onclick="renderTable()">Apply filters</button>
+  </div>
+  <div class="card">
+    <div class="table-top">
+      <div><b id="rowCount">12 observations</b><div style="font-size:11px;color:var(--muted)">Illustrative preview dataset</div></div>
+      <div class="export-group">
+        <button class="btn small" onclick="exportData('csv')">CSV</button>
+        <button class="btn small" onclick="exportData('json')">JSON</button>
+        <button class="btn small" onclick="exportData('geojson')">GeoJSON</button>
+      </div>
+    </div>
+    <div class="table-wrap"><table class="data-table"><thead><tr>
+      <th onclick="sortBy('date')">Date ↕</th><th onclick="sortBy('aqi')">AQI ↕</th><th onclick="sortBy('temp')">Temp ↕</th><th onclick="sortBy('lst')">LST ↕</th><th onclick="sortBy('ndvi')">NDVI ↕</th><th onclick="sortBy('building')">Building ↕</th><th>Risk</th>
+    </tr></thead><tbody id="dataBody"></tbody></table></div>
+  </div>
+</section>
+
+<section id="insights" class="page">
+  <div class="page-title"><div class="eyebrow">Interpretation</div><h2>Insights & forecast</h2><p>Separate measured observations from derived relationships and model-based estimates.</p></div>
+  <div class="content-grid">
+    <div class="card" style="padding:20px">
+      <div class="eyebrow">Heat risk</div><h2 style="margin-top:6px">High · 82%</h2>
+      <p>Estimated probability of high heat risk under the current conditions and forecast signals.</p>
+      <div class="bar" style="height:12px"><span style="width:82%;display:block;height:100%;background:var(--red);border-radius:10px"></span></div>
+      <div class="insight"><b>Possible contributing signals</b><p>High temperature, low wind, lower vegetation and relatively high building density.</p></div>
+      <div class="insight" style="border-left-color:var(--green)"><b>Observation</b><p>Selected hotspot shows LST about 3.4°C above the nearby reference area in the latest satellite observation.</p></div>
+    </div>
+    <div class="card chart-card"><h3>5-day temperature outlook</h3><div class="chart" id="forecastChart"></div>
+      <div class="status"><span>Tomorrow</span><strong>39.1°C</strong></div>
+      <div class="status"><span>Wind</span><strong>1.5 m/s</strong></div>
+      <div class="status"><span>Rain probability</span><strong>18%</strong></div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="container" style="display:flex;justify-content:space-between;gap:15px;flex-wrap:wrap">
+    <span>UrbanCool Twin · Public environmental intelligence prototype</span>
+    <span>Observations · Analysis · Prediction · Export</span>
+  </div>
+</footer>
+
+<script>
+const rows=[
+ {date:"2026-08-01",aqi:68,temp:35.2,lst:39.1,ndvi:.42,building:61,risk:"Moderate"},
+ {date:"2026-08-03",aqi:74,temp:36.1,lst:40.3,ndvi:.41,building:61,risk:"Moderate"},
+ {date:"2026-08-05",aqi:81,temp:37.4,lst:41.7,ndvi:.40,building:62,risk:"High"},
+ {date:"2026-08-08",aqi:87,temp:38.0,lst:42.2,ndvi:.39,building:63,risk:"High"},
+ {date:"2026-08-10",aqi:92,temp:38.7,lst:43.0,ndvi:.36,building:64,risk:"High"},
+ {date:"2026-08-13",aqi:79,temp:36.8,lst:40.8,ndvi:.38,building:65,risk:"Moderate"},
+ {date:"2026-08-16",aqi:83,temp:37.9,lst:41.4,ndvi:.34,building:66,risk:"High"},
+ {date:"2026-08-19",aqi:96,temp:39.0,lst:43.6,ndvi:.31,building:67,risk:"High"},
+ {date:"2026-08-22",aqi:88,temp:38.2,lst:42.4,ndvi:.30,building:68,risk:"High"},
+ {date:"2026-08-25",aqi:76,temp:37.0,lst:40.1,ndvi:.33,building:67,risk:"Moderate"},
+ {date:"2026-08-28",aqi:84,temp:38.1,lst:41.8,ndvi:.32,building:67,risk:"High"},
+ {date:"2026-08-30",aqi:72,temp:38.4,lst:41.2,ndvi:.32,building:67,risk:"Moderate"}
+];
+let filtered=[...rows], sortKey="date", sortAsc=true;
+
+function showPage(id){
+ document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===id));
+ document.querySelectorAll("[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===id));
+ document.getElementById("mobileNav").classList.remove("open");
+ window.scrollTo({top:0,behavior:"smooth"});
+ if(id==="data") renderTable();
+}
+
+document.querySelectorAll("[data-page]").forEach(b=>b.addEventListener("click",()=>showPage(b.dataset.page)));
+
+document.getElementById("themeBtn").addEventListener("click",()=>{
+ const body=document.body;
+ const dark=body.getAttribute("data-theme")==="dark";
+ body.setAttribute("data-theme",dark?"light":"dark");
+ document.getElementById("themeBtn").textContent=dark?"☾":"☀︎";
+ localStorage.setItem("urbancool-theme",dark?"light":"dark");
+ drawAllCharts();
+});
+const savedTheme=localStorage.getItem("urbancool-theme");
+if(savedTheme){document.body.setAttribute("data-theme",savedTheme);document.getElementById("themeBtn").textContent=savedTheme==="dark"?"☀︎":"☾"}
+
+document.getElementById("menuBtn").addEventListener("click",()=>document.getElementById("mobileNav").classList.toggle("open"));
+
+function mapHTML(){
+ return `<div class="map-base"></div>
+ <div class="heat-blob blob1"></div><div class="heat-blob blob2"></div><div class="heat-blob blob3"></div><div class="heat-blob blob4"></div><div class="heat-blob blob5"></div>
+ <div class="road r1"></div><div class="road r2"></div><div class="road r3"></div>
+ <div class="map-controls">
+   <button class="layer-btn active" onclick="setLayer(this,'Heat')">Heat</button>
+   <button class="layer-btn" onclick="setLayer(this,'AQI')">AQI</button>
+   <button class="layer-btn" onclick="setLayer(this,'Vegetation')">Vegetation</button>
+   <button class="layer-btn" onclick="setLayer(this,'Buildings')">Buildings</button>
+ </div>
+ <div class="marker m1" onclick="openPopup()"></div><div class="marker m2" onclick="openPopup()"></div><div class="marker m3" onclick="openPopup()"></div><div class="marker m4" onclick="openPopup()"></div>
+ <div class="map-popup" id="mapPopup"><strong>Central Bhubaneswar</strong><div class="popup-row"><span>AQI</span><b>82</b></div><div class="popup-row"><span>Temperature</span><b>39.1°C</b></div><div class="popup-row"><span>LST</span><b>42.0°C</b></div><div class="popup-row"><span>NDVI</span><b>.21</b></div></div>
+ <div class="legend"><b>HEAT INTENSITY</b><div class="gradient"></div><div style="display:flex;justify-content:space-between"><span>Low</span><span>High</span></div></div>`;
+}
+document.getElementById("homeMap").innerHTML=mapHTML();
+document.getElementById("fullMap").innerHTML=mapHTML();
+
+function openPopup(){document.querySelectorAll(".map-popup").forEach(p=>p.classList.toggle("show"))}
+function setLayer(btn,name){
+ btn.parentElement.querySelectorAll(".layer-btn").forEach(x=>x.classList.remove("active"));btn.classList.add("active");
+ const wrap=btn.closest(".map-wrap");
+ const blobs=wrap.querySelectorAll(".heat-blob");
+ if(name==="Heat"){blobs.forEach((b,i)=>b.style.opacity=[.68,.68,.68,.68,.52][i])}
+ else if(name==="Vegetation"){blobs.forEach(b=>b.style.background="#22c55e")}
+ else if(name==="AQI"){blobs.forEach(b=>b.style.background="#dc2626")}
+ else {blobs.forEach(b=>b.style.background="#8b5cf6")}
+}
+
+function svgChart(id,values,labels=[],pointsColor="var(--accent)"){
+ const el=document.getElementById(id); if(!el)return;
+ const w=600,h=240,p=28,min=Math.min(...values)-2,max=Math.max(...values)+2;
+ const pts=values.map((v,i)=>{const x=p+i*(w-2*p)/(values.length-1);const y=h-p-(v-min)*(h-2*p)/(max-min);return [x,y]});
+ const poly=pts.map(x=>x.join(",")).join(" ");
+ const area=`${p},${h-p} ${poly} ${w-p},${h-p}`;
+ const grid=[.25,.5,.75].map(t=>`<line class="gridline" x1="${p}" x2="${w-p}" y1="${p+(h-2*p)*t}" y2="${p+(h-2*p)*t}"/>`).join("");
+ const dots=pts.map(x=>`<circle cx="${x[0]}" cy="${x[1]}" r="3.5" fill="${pointsColor}"/>`).join("");
+ el.innerHTML=`<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${grid}<polygon class="area" points="${area}"/><polyline class="line" style="stroke:${pointsColor}" points="${poly}"/>${dots}<text class="axis" x="${p}" y="${h-5}">${labels[0]||"Start"}</text><text class="axis" x="${w-p-35}" y="${h-5}">${labels[labels.length-1]||"Now"}</text><text class="axis" x="2" y="${p+5}">${max.toFixed(0)}</text><text class="axis" x="2" y="${h-p}">${min.toFixed(0)}</text></svg>`;
+}
+function scatter(id,xs,ys){
+ const el=document.getElementById(id);if(!el)return;
+ const w=600,h=240,p=30,xmin=Math.min(...xs)-.02,xmax=Math.max(...xs)+.02,ymin=Math.min(...ys)-1,ymax=Math.max(...ys)+1;
+ const dots=xs.map((x,i)=>{let px=p+(x-xmin)*(w-2*p)/(xmax-xmin),py=h-p-(ys[i]-ymin)*(h-2*p)/(ymax-ymin);return `<circle cx="${px}" cy="${py}" r="5" fill="var(--accent)" opacity=".75"/>`}).join("");
+ el.innerHTML=`<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><line class="gridline" x1="${p}" x2="${w-p}" y1="${h-p}" y2="${h-p}"/><line class="gridline" x1="${p}" x2="${p}" y1="${p}" y2="${h-p}"/>${dots}<text class="axis" x="${p}" y="${h-5}">Lower</text><text class="axis" x="${w-p-40}" y="${h-5}">Higher</text><text class="axis" x="2" y="${p+5}">High</text><text class="axis" x="2" y="${h-p}">Low</text></svg>`;
+}
+function drawAllCharts(){
+ svgChart("aqiChart",[62,65,69,72,74,77,81,79,76,72,75,80,84,82,78,73,70,72,76,79,83,86,81,72],["00:00","Now"]);
+ svgChart("tempChart",[31,30,30,31,32,34,35,37,38,38,39,39,38,37,36,35,34,33,32,31,31,32,35,38],["00:00","Now"],"var(--orange)");
+ svgChart("airTrend",[66,69,72,75,71,78,82,76,84,79,87,91,86,83,80,77,81,88,92,85,81,79,76,72],["Aug 1","Aug 30"]);
+ scatter("ndviChart",rows.map(r=>r.ndvi),rows.map(r=>r.lst));
+ scatter("buildingChart",rows.map(r=>r.building),rows.map(r=>r.lst));
+ svgChart("forecastChart",[38.4,39.1,39.4,38.8,37.9,37.3],["Today","Day 5"],"var(--red)");
+}
+drawAllCharts();
+
+function renderTable(){
+ const q=(document.getElementById("search")?.value||"").toLowerCase();
+ const metric=document.getElementById("metricFilter")?.value||"all";
+ const from=document.getElementById("from")?.value||"";
+ const to=document.getElementById("to")?.value||"";
+ filtered=rows.filter(r=>{
+   const hay=Object.values(r).join(" ").toLowerCase();
+   if(q&&!hay.includes(q))return false;
+   if(from&&r.date<from)return false;
+   if(to&&r.date>to)return false;
+   if(metric==="aqi"&&r.aqi<80)return false;
+   if(metric==="temp"&&r.temp<38)return false;
+   if(metric==="lst"&&r.lst<40)return false;
+   if(metric==="ndvi"&&r.ndvi>.30)return false;
+   return true;
+ });
+ filtered.sort((a,b)=>{
+   let x=a[sortKey],y=b[sortKey]; if(x<y)return sortAsc?-1:1;if(x>y)return sortAsc?1:-1;return 0;
+ });
+ document.getElementById("rowCount").textContent=filtered.length+" observations";
+ document.getElementById("dataBody").innerHTML=filtered.map(r=>`<tr><td>${r.date}</td><td><b>${r.aqi}</b></td><td>${r.temp.toFixed(1)}°C</td><td>${r.lst.toFixed(1)}°C</td><td>${r.ndvi.toFixed(2)}</td><td>${r.building}%</td><td><span class="badge ${r.risk==="High"?"high":"moderate"}">${r.risk}</span></td></tr>`).join("");
+}
+function sortBy(key){if(sortKey===key)sortAsc=!sortAsc;else{sortKey=key;sortAsc=true}renderTable()}
+
+function exportData(type){
+ const data=filtered.length?filtered:rows;
+ let content="",mime="",filename="";
+ if(type==="csv"){
+  content="date,aqi,temperature_c,lst_c,ndvi,building_density_pct,risk\n"+data.map(r=>`${r.date},${r.aqi},${r.temp},${r.lst},${r.ndvi},${r.building},${r.risk}`).join("\n");
+  mime="text/csv";filename="urbancool-data.csv";
+ }else if(type==="json"){
+  content=JSON.stringify({metadata:{project:"UrbanCool Twin",location:"Bhubaneswar",generatedAt:new Date().toISOString()},data},null,2);
+  mime="application/json";filename="urbancool-data.json";
+ }else{
+  content=JSON.stringify({type:"FeatureCollection",features:data.map(r=>({type:"Feature",geometry:{type:"Point",coordinates:[85.824,20.296]},properties:{...r}}))},null,2);
+  mime="application/geo+json";filename="urbancool-data.geojson";
+ }
+ const blob=new Blob([content],{type:mime}),url=URL.createObjectURL(blob),a=document.createElement("a");
+ a.href=url;a.download=filename;a.click();URL.revokeObjectURL(url);
+}
+renderTable();
+</script>
+</body>
+</html>

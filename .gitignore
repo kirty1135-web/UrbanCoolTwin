@@ -1,0 +1,25 @@
+# Environments
+.env
+.env.*
+venv/
+env/
+__pycache__/
+
+# Node
+node_modules/
+dist/
+build/
+.vite/
+
+# Python
+*.pyc
+*.pyo
+*.pyd
+*.zip
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
