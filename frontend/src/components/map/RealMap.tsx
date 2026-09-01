@@ -127,19 +127,10 @@ export default function RealMap() {
 
   const getGeoJsonStyle = (feature: any) => {
     if (activeLayer === 'Vegetation') {
-      const ndvi = feature.properties.ndvi || 0.5;
-      // High-fidelity vegetation ramp (pale green to deep forest green)
-      const fillColor = ndvi > 0.7 ? '#00441b' :
-                        ndvi > 0.5 ? '#238b45' :
-                        ndvi > 0.3 ? '#41ab5d' :
-                        ndvi > 0.1 ? '#74c476' :
-                                     '#c7e9c0';
       return {
-        fillColor,
-        weight: 0.5,
-        color: '#ffffff',
-        opacity: 0.2,
-        fillOpacity: 0.8
+        fillColor: '#22c55e',
+        weight: 0,
+        fillOpacity: feature.properties.ndvi || 0.5
       };
     }
     if (activeLayer === 'Buildings') {
@@ -174,38 +165,40 @@ export default function RealMap() {
       });
     }
     
+    if (activeLayer === 'Vegetation') {
+      return layerData.features.map((f: any) => {
+        const ndvi = f.properties.ndvi || 0.5;
+        let lat = 0, lon = 0;
+        if (f.geometry.type === 'Point') {
+          lat = f.geometry.coordinates[1];
+          lon = f.geometry.coordinates[0];
+        } else if (f.geometry.type === 'Polygon' && f.geometry.coordinates[0].length > 0) {
+          // Approximate centroid using first point
+          lat = f.geometry.coordinates[0][0][1];
+          lon = f.geometry.coordinates[0][0][0];
+        }
+        return [lat, lon, ndvi];
+      });
+    }
+    
     return [];
   }, [layerData, activeLayer]);
 
+  const classicGradient = {
+    0.2: '#0000ff', // Blue
+    0.4: '#00ffff', // Cyan
+    0.6: '#00ff00', // Lime
+    0.8: '#ffff00', // Yellow
+    1.0: '#ff0000'  // Red
+  };
+
   const heatOptions = useMemo(() => {
-    if (activeLayer === 'Heat') {
+    if (activeLayer === 'Heat' || activeLayer === 'AQI' || activeLayer === 'Vegetation') {
       return {
         radius: 35,
         blur: 25,
         maxZoom: 14,
-        gradient: {
-          0.1: '#4B0082', // Indigo (Cool)
-          0.3: '#0000FF', // Blue
-          0.5: '#00FF00', // Green
-          0.7: '#FFFF00', // Yellow
-          0.9: '#FF7F00', // Orange
-          1.0: '#FF0000'  // Red (Extreme Heat)
-        }
-      };
-    }
-    if (activeLayer === 'AQI') {
-      return {
-        radius: 35,
-        blur: 25,
-        maxZoom: 14,
-        gradient: {
-          0.1: '#00e400', // Good (Green)
-          0.3: '#ffff00', // Moderate (Yellow)
-          0.5: '#ff7e00', // Unhealthy for Sensitive (Orange)
-          0.7: '#ff0000', // Unhealthy (Red)
-          0.9: '#8f3f97', // Very Unhealthy (Purple)
-          1.0: '#7e0023'  // Hazardous (Maroon)
-        }
+        gradient: classicGradient
       };
     }
     return {};
@@ -213,7 +206,7 @@ export default function RealMap() {
 
 
   return (
-    <div className="w-full h-[600px] relative rounded-xl overflow-hidden border border-slate-700 bg-slate-900">
+    <div className="w-full h-[800px] relative rounded-xl overflow-hidden border border-slate-700 bg-slate-900 shadow-xl">
       
       {/* Map Controls Overlay - Moved to Top Center */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-4 bg-slate-900/90 p-2 px-4 rounded-full backdrop-blur-md border border-slate-700 shadow-xl pointer-events-auto">
@@ -261,12 +254,12 @@ export default function RealMap() {
         )}
 
         {/* TRUE HEATMAP LAYER */}
-        {(activeLayer === 'Heat' || activeLayer === 'AQI') && !eeUrl && heatPoints.length > 0 && (
+        {(activeLayer === 'Heat' || activeLayer === 'AQI' || activeLayer === 'Vegetation') && !eeUrl && heatPoints.length > 0 && (
           <HeatmapLayer points={heatPoints} options={heatOptions} />
         )}
 
-        {/* Fallback Vector Layers (Vegetation and Buildings only now) */}
-        {(activeLayer === 'Vegetation' || activeLayer === 'Buildings') && layerData?.type === 'FeatureCollection' && (
+        {/* Fallback Vector Layers (Buildings only now, Vegetation is heatmap) */}
+        {activeLayer === 'Buildings' && layerData?.type === 'FeatureCollection' && (
           <GeoJSON 
             key={geojsonKey}
             data={layerData} 
@@ -300,6 +293,10 @@ export default function RealMap() {
                   <div className="flex justify-between">
                     <span>Surface Temperature</span>
                     <span className="text-white">{attribution.surface_temp?.toFixed(1)}°C</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Current AQI</span>
+                    <span className="text-white">{attribution.current_aqi}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Expected Temperature</span>

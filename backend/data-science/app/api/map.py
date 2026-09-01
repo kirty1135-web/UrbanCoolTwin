@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Query
 import httpx
 import json
+import asyncio
+import random
 
 router = APIRouter()
 
@@ -129,50 +131,48 @@ async def get_heat_geojson(
         if tile_url:
             return {"type": "EE_TileLayer", "url": tile_url}
 
-    # Fetch real temperature for the bounding box corners and center
-    lats = f"{min_lat},{max_lat},{(min_lat+max_lat)/2}"
-    lons = f"{min_lon},{max_lon},{(min_lon+max_lon)/2}"
-    
-    url = f"https://api.open-meteo.com/v1/forecast?latitude={lats}&longitude={lons}&current=temperature_2m"
-    async with httpx.AsyncClient() as client:
-        try:
-            resp = await client.get(url)
-            data = resp.json()
-            # If multiple locations requested, open-meteo returns an array of responses
-            if isinstance(data, list) and len(data) > 0:
-                base_temp = data[0].get("current", {}).get("temperature_2m", 35)
-            else:
-                base_temp = data.get("current", {}).get("temperature_2m", 35)
-        except:
-            base_temp = 35
-
-    features = []
-    # Generate a dense 25x25 grid (625 points) to create a high-fidelity modeled heatmap
-    grid_steps = 25
-    lat_step = (max_lat - min_lat) / grid_steps
-    lon_step = (max_lon - min_lon) / grid_steps
-    
-    import random
+    # Generate 676 organic scattered points
+    num_points = 676
     random.seed(int(min_lat * 100)) # stable randomness based on bbox
     
-    for i in range(grid_steps):
-        for j in range(grid_steps):
-            lat = min_lat + i * lat_step + (lat_step / 2)
-            lon = min_lon + j * lon_step + (lon_step / 2)
-            
-            # Add minor spatial variation based on location to simulate UHI (urban heat island)
-            dist_to_center = ((lon - (min_lon+max_lon)/2)**2 + (lat - (min_lat+max_lat)/2)**2)**0.5
-            
-            # Combine center heat concentration with random local noise
-            noise = (random.random() - 0.5) * 1.5
-            temp = base_temp + (0.005 / (dist_to_center + 0.001)) + noise
-            temp = max(base_temp - 2, min(temp, base_temp + 6.0))
+    points = []
+    for _ in range(num_points):
+        lat = min_lat + random.random() * (max_lat - min_lat)
+        lon = min_lon + random.random() * (max_lon - min_lon)
+        points.append((lat, lon))
+        
+    chunk_size = 90
+    chunks = [points[i:i + chunk_size] for i in range(0, len(points), chunk_size)]
+    
+    async def fetch_chunk(client, chunk):
+        lats = ",".join([f"{p[0]:.4f}" for p in chunk])
+        lons = ",".join([f"{p[1]:.4f}" for p in chunk])
+        url = f"https://api.open-meteo.com/v1/forecast?latitude={lats}&longitude={lons}&current=temperature_2m"
+        try:
+            resp = await client.get(url, timeout=10.0)
+            data = resp.json()
+            if isinstance(data, list):
+                return [d.get("current", {}).get("temperature_2m", 35.0) for d in data]
+            else:
+                return [data.get("current", {}).get("temperature_2m", 35.0)] * len(chunk)
+        except Exception:
+            return [35.0] * len(chunk)
 
-            features.append({
-                "type": "Feature",
-                "properties": {"temp": temp},
-                "geometry": {"type": "Point", "coordinates": [lon, lat]}
-            })
+    async with httpx.AsyncClient() as client:
+        tasks = [fetch_chunk(client, chunk) for chunk in chunks]
+        results = await asyncio.gather(*tasks)
+        
+    # Flatten results
+    temps = [temp for chunk_result in results for temp in chunk_result]
+    
+    features = []
+    for i, (lat, lon) in enumerate(points):
+        temp = temps[i] if i < len(temps) and temps[i] is not None else 35.0
+        features.append({
+            "type": "Feature",
+            "properties": {"temp": temp},
+            "geometry": {"type": "Point", "coordinates": [lon, lat]}
+        })
 
     return {"type": "FeatureCollection", "features": features}
 
@@ -183,54 +183,54 @@ async def get_aqi_geojson(
     max_lon: float = Query(...),
     max_lat: float = Query(...)
 ):
-    # Fetch true physical AQI using Open-Meteo and simulate station points within bbox
-    # since WAQI demo token is restricted and returns invalid key outside Shanghai
-    center_lat = (min_lat + max_lat) / 2
-    center_lon = (min_lon + max_lon) / 2
+    # Generate 676 organic scattered points
+    num_points = 676
+    random.seed(int(min_lat * 100))
     
-    url = f"https://air-quality-api.open-meteo.com/v1/air-quality?latitude={center_lat}&longitude={center_lon}&current=us_aqi&timezone=auto"
+    points = []
+    for _ in range(num_points):
+        lat = min_lat + random.random() * (max_lat - min_lat)
+        lon = min_lon + random.random() * (max_lon - min_lon)
+        points.append((lat, lon))
+        
+    chunk_size = 90
+    chunks = [points[i:i + chunk_size] for i in range(0, len(points), chunk_size)]
     
-    async with httpx.AsyncClient() as client:
+    async def fetch_chunk(client, chunk):
+        lats = ",".join([f"{p[0]:.4f}" for p in chunk])
+        lons = ",".join([f"{p[1]:.4f}" for p in chunk])
+        url = f"https://air-quality-api.open-meteo.com/v1/air-quality?latitude={lats}&longitude={lons}&current=us_aqi&timezone=auto"
         try:
             resp = await client.get(url, timeout=10.0)
             data = resp.json()
-            aqi_val = data.get("current", {}).get("us_aqi") or 50
-        except Exception as e:
-            print(f"Open-Meteo AQI Error: {e}")
-            aqi_val = 50
+            if isinstance(data, list):
+                return [d.get("current", {}).get("us_aqi", 50) for d in data]
+            else:
+                return [data.get("current", {}).get("us_aqi", 50)] * len(chunk)
+        except Exception:
+            return [50] * len(chunk)
 
+    async with httpx.AsyncClient() as client:
+        tasks = [fetch_chunk(client, chunk) for chunk in chunks]
+        results = await asyncio.gather(*tasks)
+        
+    # Flatten results
+    aqis = [aqi for chunk_result in results for aqi in chunk_result]
+    
     features = []
-    # Generate a dense 25x25 grid (625 points) for AQI map
-    grid_steps = 25
-    lat_step = (max_lat - min_lat) / grid_steps
-    lon_step = (max_lon - min_lon) / grid_steps
-    
-    import random
-    random.seed(int(center_lat * 100)) # stable randomness
-    
-    for i in range(grid_steps):
-        for j in range(grid_steps):
-            lat = min_lat + i * lat_step + (lat_step / 2)
-            lon = min_lon + j * lon_step + (lon_step / 2)
-            
-            # Spatial noise to make localized pockets of high/low AQI
-            noise = random.randint(-15, 15)
-            # Add slight gradient: East side worse AQI (industrial simulation)
-            gradient = ((lon - min_lon) / (max_lon - min_lon)) * 20
-            
-            station_aqi = max(0, aqi_val + noise + gradient)
-            
-            features.append({
-                "type": "Feature",
-                "properties": {
-                    "value": station_aqi,
-                    "name": f"Grid {i}-{j}",
-                    "uid": f"{i}-{j}"
-                },
-                "geometry": {
-                    "type": "Point",
-                    "coordinates": [lon, lat]
-                }
-            })
+    for i, (lat, lon) in enumerate(points):
+        aqi_val = aqis[i] if i < len(aqis) and aqis[i] is not None else 50
+        features.append({
+            "type": "Feature",
+            "properties": {
+                "value": aqi_val,
+                "name": "Live Station",
+                "uid": str(random.randint(1000, 9999))
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [lon, lat]
+            }
+        })
 
     return {"type": "FeatureCollection", "features": features}

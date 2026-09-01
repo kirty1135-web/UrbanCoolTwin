@@ -54,9 +54,6 @@ export default function Home() {
         <MetricCard label="AIR QUALITY INDEX" value={aqiLoading ? '...' : aqiVal.toString()} sub={`PM2.5 · ${pm25} µg/m³`} type="aqi">
           <span className={`badge ${aqiVal > 100 ? 'high' : 'moderate'}`}>{aqiCat}</span>
         </MetricCard>
-        <MetricCard label="HEAT RISK" value="HIGH" sub="Model-derived probability" type="heat">
-          <span className="badge high">82% estimated</span>
-        </MetricCard>
         <MetricCard label="AIR TEMPERATURE" value="38.4°C" sub="Feels like 40.1°C" type="temp" />
         <MetricCard label="VEGETATION" value="28%" sub="NDVI · 0.32" type="green" />
       </div>

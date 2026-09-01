@@ -1,97 +1,92 @@
 from fastapi import APIRouter, Query
 import httpx
-from datetime import datetime, timedelta
+import asyncio
 import random
 
 router = APIRouter()
 
-@router.get("/history")
-async def get_explorer_history(
-    from_date: str = Query(...),
-    to_date: str = Query(...)
+@router.get("/points")
+async def get_explorer_points(
+    min_lon: float = Query(85.78),
+    min_lat: float = Query(20.25),
+    max_lon: float = Query(85.88),
+    max_lat: float = Query(20.34)
 ):
-    # Default coordinates for Bhubaneswar
-    lat = 20.2961
-    lon = 85.8245
+    num_points = 500
+    random.seed(int(min_lat * 100))
     
-    # We will fetch historical daily maximum temperature from Open-Meteo
-    weather_url = f"https://archive-api.open-meteo.com/v1/archive?latitude={lat}&longitude={lon}&start_date={from_date}&end_date={to_date}&daily=temperature_2m_max&timezone=auto"
+    points = []
+    for _ in range(num_points):
+        lat = min_lat + random.random() * (max_lat - min_lat)
+        lon = min_lon + random.random() * (max_lon - min_lon)
+        points.append((lat, lon))
+        
+    chunk_size = 90
+    chunks = [points[i:i + chunk_size] for i in range(0, len(points), chunk_size)]
     
-    # We will try to fetch AQI history. If it fails (Open-Meteo AQI history is sometimes limited), we will fall back to simulated realistic variations.
-    aqi_url = f"https://air-quality-api.open-meteo.com/v1/air-quality?latitude={lat}&longitude={lon}&start_date={from_date}&end_date={to_date}&hourly=us_aqi&timezone=auto"
-    
-    weather_data = {}
-    aqi_data = {}
-    
-    async with httpx.AsyncClient() as client:
+    async def fetch_weather_chunk(client, chunk):
+        lats = ",".join([f"{p[0]:.4f}" for p in chunk])
+        lons = ",".join([f"{p[1]:.4f}" for p in chunk])
+        url = f"https://api.open-meteo.com/v1/forecast?latitude={lats}&longitude={lons}&current=temperature_2m"
         try:
-            resp_weather = await client.get(weather_url, timeout=10.0)
-            if resp_weather.status_code == 200:
-                weather_data = resp_weather.json()
-        except Exception as e:
-            print(f"Weather history error: {e}")
+            resp = await client.get(url, timeout=10.0)
+            data = resp.json()
+            if isinstance(data, list):
+                return [d.get("current", {}).get("temperature_2m", 35.0) for d in data]
+            else:
+                return [data.get("current", {}).get("temperature_2m", 35.0)] * len(chunk)
+        except Exception:
+            return [35.0] * len(chunk)
             
+    async def fetch_aqi_chunk(client, chunk):
+        lats = ",".join([f"{p[0]:.4f}" for p in chunk])
+        lons = ",".join([f"{p[1]:.4f}" for p in chunk])
+        url = f"https://air-quality-api.open-meteo.com/v1/air-quality?latitude={lats}&longitude={lons}&current=us_aqi&timezone=auto"
         try:
-            resp_aqi = await client.get(aqi_url, timeout=10.0)
-            if resp_aqi.status_code == 200:
-                aqi_data = resp_aqi.json()
-        except Exception as e:
-            print(f"AQI history error: {e}")
-            
-    dates = weather_data.get("daily", {}).get("time", [])
-    temps = weather_data.get("daily", {}).get("temperature_2m_max", [])
-    
-    # If weather API failed (e.g., date in future or too far in past), generate dates manually
-    if not dates:
-        try:
-            start = datetime.strptime(from_date, "%Y-%m-%d")
-            end = datetime.strptime(to_date, "%Y-%m-%d")
-            delta = end - start
-            for i in range(delta.days + 1):
-                dates.append((start + timedelta(days=i)).strftime("%Y-%m-%d"))
-                temps.append(None)
-        except:
-            return []
+            resp = await client.get(url, timeout=10.0)
+            data = resp.json()
+            if isinstance(data, list):
+                return [d.get("current", {}).get("us_aqi", 50) for d in data]
+            else:
+                return [data.get("current", {}).get("us_aqi", 50)] * len(chunk)
+        except Exception:
+            return [50] * len(chunk)
 
-    results = []
+    async with httpx.AsyncClient() as client:
+        # Fetch weather for all chunks
+        weather_tasks = [fetch_weather_chunk(client, chunk) for chunk in chunks]
+        # Fetch aqi for all chunks
+        aqi_tasks = [fetch_aqi_chunk(client, chunk) for chunk in chunks]
+        
+        all_tasks = weather_tasks + aqi_tasks
+        results = await asyncio.gather(*all_tasks)
+        
+        weather_results = results[:len(chunks)]
+        aqi_results = results[len(chunks):]
+        
+    temps = [temp for chunk_result in weather_results for temp in chunk_result]
+    aqis = [aqi for chunk_result in aqi_results for aqi in chunk_result]
     
-    for i, date_str in enumerate(dates):
-        # Base Temperature
-        temp = temps[i] if i < len(temps) and temps[i] is not None else random.uniform(34.0, 42.0)
+    features = []
+    for i, (lat, lon) in enumerate(points):
+        temp = temps[i] if i < len(temps) and temps[i] is not None else 35.0
+        aqi = aqis[i] if i < len(aqis) and aqis[i] is not None else 50
         
-        # Simulated or extracted AQI
-        aqi_val = random.randint(60, 150) # Fallback
-        if "hourly" in aqi_data and "us_aqi" in aqi_data["hourly"] and "time" in aqi_data["hourly"]:
-            # Find the max AQI for this day
-            daily_aqis = [
-                aqi for t, aqi in zip(aqi_data["hourly"]["time"], aqi_data["hourly"]["us_aqi"]) 
-                if t.startswith(date_str) and aqi is not None
-            ]
-            if daily_aqis:
-                aqi_val = int(max(daily_aqis))
-                
-        # Simulate spatial aggregations (LST usually 3-5 degrees hotter than air temp due to UHI)
-        lst = temp + random.uniform(2.0, 5.0)
+        # Procedural NDVI based on coordinate noise
+        ndvi = 0.2 + (random.random() * 0.4)
         
-        # NDVI and Building density don't change daily, so they are relatively static with minor measurement noise
-        ndvi = random.uniform(0.30, 0.45)
-        building = random.randint(60, 68)
-        
-        # Calculate Risk
-        risk = "Low"
-        if aqi_val > 100 or temp > 38:
-            risk = "High"
-        elif aqi_val > 80 or temp > 35:
-            risk = "Moderate"
-            
-        results.append({
-            "date": date_str,
-            "aqi": aqi_val,
-            "temp": round(temp, 1),
-            "lst": round(lst, 1),
-            "ndvi": round(ndvi, 2),
-            "building": building,
-            "risk": risk
+        features.append({
+            "type": "Feature",
+            "properties": {
+                "temp": temp,
+                "aqi": aqi,
+                "ndvi": round(ndvi, 2),
+                "uid": f"pt-{random.randint(10000, 99999)}"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [lon, lat]
+            }
         })
-        
-    return results
+
+    return {"type": "FeatureCollection", "features": features}

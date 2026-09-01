@@ -46,6 +46,7 @@ async def get_heat_attribution(req: AttributionRequest):
         "surface_temp": round(req.temp, 1),
         "expected_temp": round(expected_temp, 1),
         "anomaly": round(anomaly, 1),
+        "current_aqi": req.aqi,
         "attribution": {
             "season_weather": pct_weather,
             "vegetation": pct_veg,

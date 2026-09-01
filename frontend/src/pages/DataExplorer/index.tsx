@@ -1,58 +1,69 @@
 import { useState, useMemo, useEffect } from 'react';
-
 import { fetchApi } from '../../api/client';
 
 type DataRow = {
-  date: string;
-  aqi: number;
+  id: string;
+  lat: number;
+  lon: number;
   temp: number;
-  lst: number;
+  aqi: number;
   ndvi: number;
-  building: number;
-  risk: string;
 };
 
-type SortKey = 'date' | 'aqi' | 'temp' | 'lst' | 'ndvi' | 'building';
+type SortKey = 'lat' | 'lon' | 'temp' | 'aqi' | 'ndvi';
 
 export default function DataExplorer() {
   const [search, setSearch] = useState('');
-  const [fromDate, setFromDate] = useState('2026-08-01');
-  const [toDate, setToDate] = useState('2026-08-30');
-  const [metric, setMetric] = useState('all');
+  const [minTemp, setMinTemp] = useState('');
+  const [minAqi, setMinAqi] = useState('');
   
-  const [sortKey, setSortKey] = useState<SortKey>('date');
-  const [sortAsc, setSortAsc] = useState(true);
+  const [sortKey, setSortKey] = useState<SortKey>('temp');
+  const [sortAsc, setSortAsc] = useState(false);
   
   const [rows, setRows] = useState<DataRow[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Fetch real data when fromDate or toDate changes
+  // Fetch unified real data from the backend
   useEffect(() => {
-    const fetchHistory = async () => {
-      if (!fromDate || !toDate) return;
+    const fetchMapData = async () => {
       setLoading(true);
       try {
-        const data = (await fetchApi(`/explorer/history?from=${fromDate}&to=${toDate}`)) as DataRow[];
-        setRows(data);
+        // Default bounding box for Bhubaneswar
+        const data = await fetchApi(`/explorer/points?min_lon=85.78&min_lat=20.25&max_lon=85.88&max_lat=20.34`);
+        if (data && data.features) {
+          const parsed = data.features.map((f: any) => ({
+            id: f.properties.uid,
+            lon: f.geometry.coordinates[0],
+            lat: f.geometry.coordinates[1],
+            temp: f.properties.temp,
+            aqi: f.properties.aqi,
+            ndvi: f.properties.ndvi
+          }));
+          setRows(parsed);
+        } else {
+          setRows([]);
+        }
       } catch (err) {
-        console.error("Failed to fetch historical data:", err);
+        console.error(`Failed to fetch spatial points data:`, err);
       } finally {
         setLoading(false);
       }
     };
-    fetchHistory();
-  }, [fromDate, toDate]);
+    fetchMapData();
+  }, []);
 
   const filtered = useMemo(() => {
     let result = rows.filter(r => {
-      const hay = Object.values(r).join(" ").toLowerCase();
-      if (search && !hay.includes(search.toLowerCase())) return false;
-      if (fromDate && r.date < fromDate) return false;
-      if (toDate && r.date > toDate) return false;
-      if (metric === "aqi" && r.aqi < 80) return false;
-      if (metric === "temp" && r.temp < 38) return false;
-      if (metric === "lst" && r.lst < 40) return false;
-      if (metric === "ndvi" && r.ndvi > 0.30) return false;
+      if (search) {
+        const hay = `${r.lat.toFixed(4)} ${r.lon.toFixed(4)} ${r.temp.toFixed(1)} ${r.aqi} ${r.ndvi.toFixed(2)}`.toLowerCase();
+        if (!hay.includes(search.toLowerCase())) return false;
+      }
+      if (minTemp && !isNaN(Number(minTemp))) {
+        if (r.temp < Number(minTemp)) return false;
+      }
+      if (minAqi && !isNaN(Number(minAqi))) {
+        if (r.aqi < Number(minAqi)) return false;
+      }
       return true;
     });
 
@@ -64,7 +75,7 @@ export default function DataExplorer() {
     });
 
     return result;
-  }, [search, fromDate, toDate, metric, sortKey, sortAsc]);
+  }, [search, minTemp, minAqi, rows, sortKey, sortAsc]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -81,10 +92,10 @@ export default function DataExplorer() {
     let ext = format;
 
     if (format === 'csv') {
-      const headers = ['date', 'aqi', 'temp', 'lst', 'ndvi', 'building', 'risk'];
+      const headers = ['latitude', 'longitude', 'temperature_c', 'aqi', 'ndvi'];
       content = [
         headers.join(','),
-        ...filtered.map(r => [r.date, r.aqi, r.temp, r.lst, r.ndvi, r.building, r.risk].join(','))
+        ...filtered.map(r => [r.lat.toFixed(5), r.lon.toFixed(5), r.temp.toFixed(2), r.aqi, r.ndvi.toFixed(2)].join(','))
       ].join('\n');
       type = 'text/csv';
     } else if (format === 'json') {
@@ -93,8 +104,8 @@ export default function DataExplorer() {
     } else if (format === 'geojson') {
       const features = filtered.map(r => ({
         type: 'Feature',
-        properties: r,
-        geometry: { type: 'Point', coordinates: [85.8245, 20.2961] } // Mock location for generic dataset
+        properties: { temp: r.temp, aqi: r.aqi, ndvi: r.ndvi },
+        geometry: { type: 'Point', coordinates: [r.lon, r.lat] }
       }));
       content = JSON.stringify({ type: 'FeatureCollection', features }, null, 2);
       type = 'application/geo+json';
@@ -104,7 +115,7 @@ export default function DataExplorer() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `urbancool-export-${new Date().toISOString().split('T')[0]}.${ext}`;
+    a.download = `urbancool-spatial-export-${new Date().toISOString().split('T')[0]}.${ext}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -114,81 +125,97 @@ export default function DataExplorer() {
   return (
     <>
       <div className="page-title">
-        <div className="eyebrow">Public data portal</div>
-        <h2>Data Explorer</h2>
-        <p>Select a period, filter observations, sort the table and export the visible dataset.</p>
+        <div className="eyebrow">Public Data Portal</div>
+        <h2>Unified Spatial Data Explorer</h2>
+        <p>Explore and export the unified point cloud data combining Temperature, AQI, and Vegetation cover.</p>
       </div>
 
-      <div className="card filters p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-[10px] mb-[16px]">
-        <div className="field md:col-span-1 sm:col-span-2">
-          <label className="block text-[11px] font-bold text-muted mb-1">Search</label>
-          <input className="w-full p-2 border border-border bg-surface-2 text-text rounded-md outline-none" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search date or value…" />
+      <div className="card filters p-6 flex flex-wrap gap-4 items-end mb-6">
+        <div className="field flex-1 min-w-[200px]">
+          <label className="block text-xs font-bold text-muted mb-2 uppercase tracking-wider">Search Coordinates</label>
+          <input 
+            className="w-full p-2.5 border border-border bg-surface-2 text-text rounded-lg outline-none focus:border-accent transition-colors" 
+            value={search} 
+            onChange={(e) => setSearch(e.target.value)} 
+            placeholder="Search lat/lon or value…" 
+          />
         </div>
-        <div className="field">
-          <label className="block text-[11px] font-bold text-muted mb-1">From</label>
-          <input type="date" className="w-full p-2 border border-border bg-surface-2 text-text rounded-md outline-none" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+        <div className="field flex-1 min-w-[150px]">
+          <label className="block text-xs font-bold text-muted mb-2 uppercase tracking-wider">Min Temperature (°C)</label>
+          <input 
+            type="number"
+            className="w-full p-2.5 border border-border bg-surface-2 text-text rounded-lg outline-none focus:border-accent transition-colors" 
+            value={minTemp} 
+            onChange={(e) => setMinTemp(e.target.value)} 
+            placeholder="e.g. 38"
+          />
         </div>
-        <div className="field">
-          <label className="block text-[11px] font-bold text-muted mb-1">To</label>
-          <input type="date" className="w-full p-2 border border-border bg-surface-2 text-text rounded-md outline-none" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+        <div className="field flex-1 min-w-[150px]">
+          <label className="block text-xs font-bold text-muted mb-2 uppercase tracking-wider">Min AQI</label>
+          <input 
+            type="number"
+            className="w-full p-2.5 border border-border bg-surface-2 text-text rounded-lg outline-none focus:border-accent transition-colors" 
+            value={minAqi} 
+            onChange={(e) => setMinAqi(e.target.value)} 
+            placeholder="e.g. 100"
+          />
         </div>
-        <div className="field">
-          <label className="block text-[11px] font-bold text-muted mb-1">Metric</label>
-          <select className="w-full p-2 border border-border bg-surface-2 text-text rounded-md outline-none" value={metric} onChange={(e) => setMetric(e.target.value)}>
-            <option value="all">All observations</option>
-            <option value="aqi">AQI ≥ 80</option>
-            <option value="temp">Temp ≥ 38°C</option>
-            <option value="lst">LST ≥ 40°C</option>
-            <option value="ndvi">NDVI ≤ 0.30</option>
-          </select>
-        </div>
-        <button className="btn primary self-end mt-2 md:mt-0 sm:col-span-2 md:col-span-1">Apply filters</button>
       </div>
 
       <div className="card">
-        <div className="table-top flex flex-col md:flex-row justify-between md:items-center p-4 gap-[10px]">
+        <div className="flex flex-col md:flex-row justify-between md:items-center p-6 border-b border-border/50 gap-4">
           <div>
-            <b>{filtered.length} observations</b>
-            <div style={{ fontSize: '11px', color: 'var(--muted)' }}>Illustrative preview dataset</div>
+            <b className="text-lg">{filtered.length} Points Extracted</b>
+            <div className="text-xs text-muted mt-1">Unified spatial data streaming from Open-Meteo Bulk APIs</div>
           </div>
-          <div className="export-group flex gap-[6px] flex-wrap">
-            <button className="btn small" onClick={() => handleExport('csv')}>CSV</button>
-            <button className="btn small" onClick={() => handleExport('json')}>JSON</button>
-            <button className="btn small" onClick={() => handleExport('geojson')}>GeoJSON</button>
+          <div className="flex gap-2 flex-wrap">
+            <button className="btn small bg-surface-2 hover:bg-surface border-border" onClick={() => handleExport('csv')}>CSV</button>
+            <button className="btn small bg-surface-2 hover:bg-surface border-border" onClick={() => handleExport('json')}>JSON</button>
+            <button className="btn small primary" onClick={() => handleExport('geojson')}>GeoJSON</button>
           </div>
         </div>
-        <div className="table-wrap overflow-auto">
+        <div className="overflow-auto max-h-[600px]">
           {loading ? (
-            <div className="p-8 text-center text-muted">
-              Fetching real historical climate data from Open-Meteo...
+            <div className="flex flex-col items-center justify-center p-20 text-muted">
+              <div className="w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin mb-4"></div>
+              Orchestrating concurrent bulk requests...
             </div>
           ) : (
-            <table className="data-table w-full min-w-[760px] border-collapse">
-            <thead>
+            <table className="w-full text-left border-collapse">
+            <thead className="sticky top-0 bg-surface z-10 backdrop-blur-md shadow-sm">
               <tr>
-                <th onClick={() => toggleSort('date')} className="cursor-pointer">Date ↕</th>
-                <th onClick={() => toggleSort('aqi')} className="cursor-pointer">AQI ↕</th>
-                <th onClick={() => toggleSort('temp')} className="cursor-pointer">Temp ↕</th>
-                <th onClick={() => toggleSort('lst')} className="cursor-pointer">LST ↕</th>
-                <th onClick={() => toggleSort('ndvi')} className="cursor-pointer">NDVI ↕</th>
-                <th onClick={() => toggleSort('building')} className="cursor-pointer">Building ↕</th>
-                <th>Risk</th>
+                <th onClick={() => toggleSort('lat')} className="p-4 text-xs font-bold uppercase tracking-wider text-muted cursor-pointer hover:text-accent transition-colors">Latitude ↕</th>
+                <th onClick={() => toggleSort('lon')} className="p-4 text-xs font-bold uppercase tracking-wider text-muted cursor-pointer hover:text-accent transition-colors">Longitude ↕</th>
+                <th onClick={() => toggleSort('temp')} className="p-4 text-xs font-bold uppercase tracking-wider text-muted cursor-pointer hover:text-accent transition-colors">Temperature (°C) ↕</th>
+                <th onClick={() => toggleSort('aqi')} className="p-4 text-xs font-bold uppercase tracking-wider text-muted cursor-pointer hover:text-accent transition-colors">AQI ↕</th>
+                <th onClick={() => toggleSort('ndvi')} className="p-4 text-xs font-bold uppercase tracking-wider text-muted cursor-pointer hover:text-accent transition-colors">Vegetation (NDVI) ↕</th>
               </tr>
             </thead>
-            <tbody>
-              {filtered.map((r, i) => (
-                <tr key={i} className="hover:bg-surface-2">
-                  <td>{r.date}</td>
-                  <td><b>{r.aqi}</b></td>
-                  <td>{r.temp.toFixed(1)}°C</td>
-                  <td>{r.lst.toFixed(1)}°C</td>
-                  <td>{r.ndvi.toFixed(2)}</td>
-                  <td>{r.building}%</td>
-                  <td>
-                    <span className={`badge ${r.risk === 'High' ? 'high' : 'moderate'}`}>{r.risk}</span>
+            <tbody className="divide-y divide-border/30">
+              {filtered.map((r) => (
+                <tr key={r.id} className="hover:bg-surface-2 transition-colors">
+                  <td className="p-4 font-mono text-sm">{r.lat.toFixed(5)}</td>
+                  <td className="p-4 font-mono text-sm">{r.lon.toFixed(5)}</td>
+                  <td className="p-4">
+                    <span className="font-bold text-orange-500">{r.temp.toFixed(1)}°C</span>
+                  </td>
+                  <td className="p-4">
+                    <span className={`font-bold px-2 py-1 rounded bg-surface border ${r.aqi > 100 ? 'border-red-500/30 text-red-500' : 'border-yellow-500/30 text-yellow-500'}`}>
+                      {r.aqi}
+                    </span>
+                  </td>
+                  <td className="p-4">
+                    <span className={`font-bold px-2 py-1 rounded bg-surface border ${r.ndvi > 0.4 ? 'border-green-500/30 text-green-500' : 'border-slate-500/30 text-slate-400'}`}>
+                      {r.ndvi.toFixed(2)}
+                    </span>
                   </td>
                 </tr>
               ))}
+              {filtered.length === 0 && !loading && (
+                <tr>
+                  <td colSpan={5} className="p-8 text-center text-muted">No points found matching your criteria.</td>
+                </tr>
+              )}
             </tbody>
           </table>
           )}
