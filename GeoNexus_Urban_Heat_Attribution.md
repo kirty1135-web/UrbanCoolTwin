@@ -1,3 +1,4 @@
+
 # GeoNexus — Urban Heat Attribution & Geospatial Intelligence
 
 ## 1. Vision
