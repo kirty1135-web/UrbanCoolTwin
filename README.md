@@ -104,6 +104,12 @@ The system can be used to identify areas that may need:
 
 It also considers vulnerable populations while prioritizing areas for intervention.
 
+My Contribution  
+-Frontend development 
+-UI implementation 
+-map visualization 
+-API integration
+
 Future Scope
 
 The initial system can be tested for a single city or zone and later expanded to larger areas.
